@@ -1,7 +1,7 @@
 import os
 import yaml
 
-WIKMD_CONFIG_FILE = "config.yaml"
+WIKMD_CONFIG_FILE = "/app/wiki-md/config.yaml"
 
 # Default config parameters
 WIKMD_HOST_DEFAULT = "0.0.0.0"
