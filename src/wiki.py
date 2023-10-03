@@ -31,8 +31,8 @@ HIDDEN_FOLDER_PATH_LIST = [pathify(cfg.wiki_directory, hidden_folder) for hidden
 HOMEPAGE_PATH = pathify(cfg.wiki_directory, cfg.homepage)
 HIDDEN_PATHS = tuple([UPLOAD_FOLDER_PATH, GIT_FOLDER_PATH, HOMEPAGE_PATH] + HIDDEN_FOLDER_PATH_LIST)
 
-app = Flask(cfg.app_name)
-# app = Flask(__name__)
+# app = Flask(cfg.app_name)
+app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER_PATH
 
 # console logger
