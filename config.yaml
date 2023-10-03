@@ -1,5 +1,6 @@
 # wikmd configuration file
 
+app_name: ""
 wikmd_host: "0.0.0.0"
 wikmd_port: 8080
 wikmd_logging: 1
