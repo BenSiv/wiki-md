@@ -4,6 +4,7 @@ import yaml
 WIKMD_CONFIG_FILE = "/app/wiki-md/config.yaml"
 
 # Default config parameters
+WIKMD_APP_NAME_DEFAULT = "Wiki"
 WIKMD_HOST_DEFAULT = "0.0.0.0"
 WIKMD_PORT_DEFAULT = 8080
 WIKMD_LOGGING_DEFAULT = 1
@@ -71,6 +72,7 @@ class WikmdConfig:
             yaml_config = yaml.safe_load(f)
 
         # Load config parameters from env. vars, yaml or default values (the firsts take precedence)
+        self.wikmd_app_name = os.getenv("APP_NAME") or yaml_config["app_name"] or WIKMD_APP_NAME_DEFAULT
         self.wikmd_host = os.getenv("WIKMD_HOST") or yaml_config["wikmd_host"] or WIKMD_HOST_DEFAULT
         self.wikmd_port = os.getenv("WIKMD_PORT") or yaml_config["wikmd_port"] or WIKMD_PORT_DEFAULT
         self.wikmd_logging = os.getenv("WIKMD_LOGGING") or yaml_config["wikmd_logging"] or WIKMD_LOGGING_DEFAULT
