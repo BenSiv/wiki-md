@@ -1,4 +1,4 @@
-# wikmd 
+# wiki-md 
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/linbreux/wikmd/docker.yml?style=flat-square) ![GitHub Repo stars](https://img.shields.io/github/stars/linbreux/wikmd?style=flat-square) ![GitHub release (latest by date)](https://img.shields.io/github/v/release/linbreux/wikmd?style=flat-square) ![GitLab](https://img.shields.io/gitlab/license/linbreux/wikmd?style=flat-square)
 > :information_source: **Information** can be found in the docs: [https://linbreux.github.io/wikmd/](https://linbreux.github.io/wikmd/)
 
@@ -35,3 +35,7 @@ Detailed installation instruction can be found [here](https://linbreux.github.io
 
 More info can be found in the [docs](https://linbreux.github.io/wikmd/knowledge%20graph.html).
 
+
+## Trouble-Shooting
+
+- If the knowlage graph shows nothing and no exception is thrown, it might be dua to page namings. It seems that the names have to be in a title case or at least the last word before the '.md' with first upper case letter.
