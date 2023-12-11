@@ -1,5 +1,4 @@
 import os
-import sys
 import time
 import logging
 import uuid
@@ -24,12 +23,7 @@ from utils import pathify
 
 SESSIONS = []
 
-if len(sys.argv) > 1:
-    config_file = sys.argv[1]
-else:
-    config_file = "/app/wiki-md/config.yaml"
-
-cfg = WikmdConfig(config_file)
+cfg = WikmdConfig()
 
 UPLOAD_FOLDER_PATH = pathify(cfg.wiki_directory, cfg.images_route)
 GIT_FOLDER_PATH = pathify(cfg.wiki_directory, '.git')

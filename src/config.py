@@ -64,21 +64,17 @@ class WikmdConfig:
     """
     Class that stores the configuration of wikmd.
     """
-    def __init__(self, config_file_path):
+    def __init__(self):
         """
         Function that gets the configuration parameters from .yaml file, os environment variables or default values.
         Each configuration parameter is stored into a class attribute.
         Env. vars take precedence.
         """
-        # __location__ = os.path.realpath(
-        #     os.path.join(os.getcwd(), os.path.dirname(__file__)))
+        __location__ = os.path.realpath(
+            os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
-        # # .yaml config file
-        # with open(os.path.join(__location__,WIKMD_CONFIG_FILE)) as f:
-        #     yaml_config = yaml.safe_load(f)
-
-        # Load config parameters from .yaml file
-        with open(config_file_path) as f:
+        # .yaml config file
+        with open(os.path.join(__location__,WIKMD_CONFIG_FILE)) as f:
             yaml_config = yaml.safe_load(f)
             
         # Load config parameters from env. vars, yaml or default values (the firsts take precedence)
