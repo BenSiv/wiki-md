@@ -1,4 +1,5 @@
 import os
+from os.path import exists
 import time
 import logging
 import uuid
@@ -7,8 +8,15 @@ import pypandoc
 import knowledge_graph
 import secrets
 
+<<<<<<< HEAD
 from flask import Flask, render_template, request, redirect, url_for, make_response, send_file, send_from_directory, session
 from werkzeug.utils import safe_join
+=======
+from flask import Flask, render_template, request, redirect, url_for, make_response, send_file, \
+    send_from_directory, flash
+
+from werkzeug.utils import safe_join, secure_filename
+>>>>>>> upstream_sync
 from threading import Thread
 from hashlib import sha256
 from cache import Cache
@@ -31,9 +39,10 @@ HIDDEN_FOLDER_PATH_LIST = [pathify(cfg.wiki_directory, hidden_folder) for hidden
 HOMEPAGE_PATH = pathify(cfg.wiki_directory, cfg.homepage)
 HIDDEN_PATHS = tuple([UPLOAD_FOLDER_PATH, GIT_FOLDER_PATH, HOMEPAGE_PATH] + HIDDEN_FOLDER_PATH_LIST)
 
-# app = Flask(cfg.app_name)
-app = Flask(__name__)
+# app = Flask(__name__)
+app = Flask(__name__, template_folder="../templates", static_folder="../static")
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER_PATH
+app.config['SECRET_KEY'] = cfg.secret_key
 
 app.secret_key = 'your_secret_key'
 
@@ -109,7 +118,6 @@ SYSTEM_SETTINGS = {
     "plugins": plugins
 }
 
-
 def process(content: str, page_name: str):
     """
     Function that processes the content with the plugins.
@@ -128,6 +136,31 @@ def process(content: str, page_name: str):
             processed = plugin.process_md(processed)
 
     return processed
+
+
+def ensure_page_can_be_created(page, page_name):
+    filename = safe_join(cfg.wiki_directory, f"{page_name}.md")
+    path_exists = os.path.exists(filename)
+    safe_name = "/".join([secure_filename(part) for part in page_name.split("/")])
+    filename_is_ok = safe_name == page_name
+    if not path_exists and filename_is_ok and page_name:  # Early exist
+        return
+
+    if path_exists:
+        flash('A page with that name already exists. The page name needs to be unique.')
+        app.logger.info(f"Page name exists >>> {page_name}.")
+
+    if not filename_is_ok:
+        flash(f"Page name not accepted. Try using '{safe_name}'.")
+        app.logger.info(f"Page name isn't secure >>> {page_name}.")
+
+    if not page_name:
+        flash(f"Your page needs a name.")
+        app.logger.info(f"No page name provided.")
+
+    content = process(request.form['CT'], page_name)
+    return render_template("new.html", content=content, title=page, upload_path=cfg.images_route,
+                           image_allowed_mime=cfg.image_allowed_mime, system=SYSTEM_SETTINGS)
 
 
 def save(page_name):
@@ -175,6 +208,53 @@ def fetch_page_name() -> str:
     if page_name[-4:] == "{id}":
         page_name = f"{page_name[:-4]}{uuid.uuid4().hex}"
     return page_name
+
+
+def get_html(file_page):
+    """
+    Function to return the html of a certain file page
+    """
+    md_file_path = safe_join(cfg.wiki_directory, f"{file_page}.md")
+    mod = "Last modified: %s" % time.ctime(os.path.getmtime(md_file_path))
+    folder = file_page.split("/")
+    file_page = folder[-1:][0]
+    folder = folder[:-1]
+    folder = "/".join(folder)
+
+    cached_entry = cache.get(md_file_path)
+    if cached_entry:
+        app.logger.info(f"Showing HTML page from cache >>> '{file_page}'")
+
+        for plugin in plugins:
+            if "process_html" in dir(plugin):
+                app.logger.info(f"Plug/{plugin.get_plugin_name()} - process_html >>> {file_page}")
+                cached_entry = plugin.process_html(cached_entry)
+        
+        return cached_entry, mod
+
+    app.logger.info(f"Converting to HTML with pandoc >>> '{md_file_path}' ...")
+
+    html = pypandoc.convert_file(md_file_path, "html5",
+                                    format='md', extra_args=["--mathjax"], filters=['pandoc-xnos'])
+
+    if html.strip():
+        html = clean_html(html)
+
+    for plugin in plugins:
+        if "process_before_cache_html" in dir(plugin):
+            app.logger.info(f"Plug/{plugin.get_plugin_name()} - process_before_cache_html >>> {file_page}")
+            html = plugin.process_before_cache_html(html)
+
+    cache.set(md_file_path, html)
+
+    for plugin in plugins:
+        if "process_html" in dir(plugin):
+            app.logger.info(f"Plug/{plugin.get_plugin_name()} - process_html >>> {file_page}")
+            html = plugin.process_html(html)
+
+    app.logger.info(f"Showing HTML page >>> '{file_page}'")
+
+    return html, mod
 
 
 @app.route('/list/', methods=['GET'])
@@ -227,6 +307,10 @@ def file_page(file_page):
     if request.args.get("q"):
         return search(request.args.get("q"), request.args.get("page", 1))
     else:
+
+        git_sync_thread = Thread(target=wrm.git_pull, args=())
+        git_sync_thread.start()
+
         html = ""
         mod = ""
         folder = ""
@@ -235,65 +319,25 @@ def file_page(file_page):
             return
 
         try:
-            md_file_path = safe_join(cfg.wiki_directory, f"{file_page}.md")
-            mod = "Last modified: %s" % time.ctime(os.path.getmtime(md_file_path))
-            folder = file_page.split("/")
-            file_page = folder[-1:][0]
-            folder = folder[:-1]
-            folder = "/".join(folder)
+            html_content, mod = get_html(file_page)
 
-            cached_entry = cache.get(md_file_path)
-            if cached_entry:
-                app.logger.info(f"Showing HTML page from cache >>> '{file_page}'")
-
-                for plugin in plugins:
-                    if "process_html" in dir(plugin):
-                        app.logger.info(f"Plug/{plugin.get_plugin_name()} - process_html >>> {file_page}")
-                        cached_entry = plugin.process_html(cached_entry)
-
-                return render_template(
-                    'content.html', title=file_page, folder=folder, info=cached_entry, modif=mod,
-                    system=SYSTEM_SETTINGS, app_title=cfg.app_name
-                )
-
-            try:
-                app.logger.info(f"Converting to HTML with pandoc >>> '{md_file_path}' ...")
-
-                html = pypandoc.convert_file(md_file_path, "html5",
-                                             format='md', extra_args=["--mathjax"], filters=['pandoc-xnos'])
-
-                html = clean_html(html)
-
-                for plugin in plugins:
-                    if "process_before_cache_html" in dir(plugin):
-                        app.logger.info(f"Plug/{plugin.get_plugin_name()} - process_before_cache_html >>> {file_page}")
-                        html = plugin.process_before_cache_html(html)
-
-                cache.set(md_file_path, html)
-
-                for plugin in plugins:
-                    if "process_html" in dir(plugin):
-                        app.logger.info(f"Plug/{plugin.get_plugin_name()} - process_html >>> {file_page}")
-                        html = plugin.process_html(html)
-
-                app.logger.info(f"Showing HTML page >>> '{file_page}'")
-            except Exception as a:
-                app.logger.info(a)
-
-            return render_template('content.html', title=file_page, folder=folder, info=html, modif=mod,
-                                   system=SYSTEM_SETTINGS, app_title=cfg.app_name)
+            return render_template(
+                'content.html', title=file_page, folder=folder, info=html_content, modif=mod,
+                system=SYSTEM_SETTINGS
+        )
         except FileNotFoundError as e:
             app.logger.info(e)
             return redirect("/add_new?page=" + file_page)
 
 
-# @app.route('/', methods=['GET'])
-# def index():
-#     if request.args.get("q"):
-#         return search(request.args.get("q"), request.args.get("page", 1))
-#     else:
-#         html = ""
-#         app.logger.info("Showing HTML page >>> 'homepage'")
+@app.route('/', methods=['GET'])
+def index():
+    if request.args.get("q"):
+        return search(request.args.get("q"), request.args.get("page", 1))
+    else:
+        
+        html = ""
+        app.logger.info("Showing HTML page >>> 'homepage'")
 
 #         md_file_path = os.path.join(cfg.wiki_directory, cfg.homepage)
 #         cached_entry = cache.get(md_file_path)
@@ -323,6 +367,11 @@ def add_new():
         return login("/add_new")
     if request.method == 'POST':
         page_name = fetch_page_name()
+
+        re_render_page = ensure_page_can_be_created(page_name, page_name)
+        if re_render_page:
+            return re_render_page
+
         save(page_name)
         git_sync_thread = Thread(target=wrm.git_sync, args=(page_name, "Add"))
         git_sync_thread.start()
@@ -339,10 +388,11 @@ def add_new():
 @app.route('/edit/homepage', methods=['POST', 'GET'])
 def edit_homepage():
     if bool(cfg.protect_edit_by_password) and (request.cookies.get('session_wikmd') not in SESSIONS):
-        return login("/edit/homepage")
+        return login("edit/homepage")
 
     if request.method == 'POST':
         page_name = fetch_page_name()
+
         save(page_name)
         git_sync_thread = Thread(target=wrm.git_sync, args=(page_name, "Edit"))
         git_sync_thread.start()
@@ -364,6 +414,8 @@ def remove(page):
 
     filename = safe_join(cfg.wiki_directory, f"{page}.md")
     os.remove(filename)
+    if not os.listdir(os.path.dirname(filename)):
+        os.removedirs(os.path.dirname(filename))
     git_sync_thread = Thread(target=wrm.git_sync, args=(page, "Remove"))
     git_sync_thread.start()
     return redirect("/")
@@ -372,12 +424,17 @@ def remove(page):
 @app.route('/edit/<path:page>', methods=['POST', 'GET'])
 def edit(page):
     if bool(cfg.protect_edit_by_password) and (request.cookies.get('session_wikmd') not in SESSIONS):
-        return login(page)
+        return login("edit/" + page)
 
     filename = safe_join(cfg.wiki_directory, f"{page}.md")
     if request.method == 'POST':
         page_name = fetch_page_name()
+
         if page_name != page:
+            re_render_page = ensure_page_can_be_created(page_name, page_name)
+            if re_render_page:
+                return re_render_page
+
             os.remove(filename)
 
         save(page_name)
@@ -386,10 +443,15 @@ def edit(page):
 
         return redirect(url_for("file_page", file_page=page_name))
     else:
-        with open(filename, 'r', encoding="utf-8", errors='ignore') as f:
-            content = f.read()
-        return render_template("new.html", content=content, title=page, upload_path=cfg.images_route,
-                               image_allowed_mime=cfg.image_allowed_mime, system=SYSTEM_SETTINGS, app_title=cfg.app_name)
+        if exists(filename):
+            with open(filename, 'r', encoding="utf-8", errors='ignore') as f:
+                content = f.read()
+            return render_template("new.html", content=content, title=page, upload_path=cfg.images_route,
+                                image_allowed_mime=cfg.image_allowed_mime, system=SYSTEM_SETTINGS)
+        else:
+            logger.error(f"{filename} does not exists. Creating a new one.")
+            return render_template("new.html", content="", title=page, upload_path=cfg.images_route,
+                                image_allowed_mime=cfg.image_allowed_mime, system=SYSTEM_SETTINGS)
 
 
 @app.route(os.path.join("/", cfg.images_route), methods=['POST', 'DELETE'])
@@ -434,7 +496,7 @@ def login(page):
         sha_string = sha256(password.encode('utf-8')).hexdigest()
         if sha_string == cfg.password_in_sha_256.lower():
             app.logger.info("User successfully logged in")
-            resp = make_response(redirect(page))
+            resp = make_response(redirect("/" + page))
             session = secrets.token_urlsafe(1024 // 8)
             resp.set_cookie("session_wikmd", session)
             SESSIONS.append(session)
@@ -460,8 +522,13 @@ def nav_id_to_page(id):
 @app.route(os.path.join("/", cfg.images_route, "<path:image_name>"))
 def display_image(image_name):
     image_path = safe_join(UPLOAD_FOLDER_PATH, image_name)
+    try:
+        response = send_file(image_path)
+    except Exception:
+        app.logger.error(f"Could not find image: {image_path}")
+        return ""
+
     app.logger.info(f"Showing image >>> '{image_path}'")
-    response = send_file(image_path)
     # cache indefinitely
     response.headers["Cache-Control"] = "max-age=31536000, immutable"
     return response
@@ -524,6 +591,9 @@ def run_wiki():
     watchdog.start()
     app.run(host=cfg.wikmd_host, port=cfg.wikmd_port, debug=True, use_reloader=False)
 
+for plugin in plugins:
+    if "request_html" in dir(plugin):
+        plugin.request_html(get_html)
 
 if __name__ == '__main__':
     run_wiki()
