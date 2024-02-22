@@ -7,7 +7,7 @@ import pypandoc
 import knowledge_graph
 import secrets
 
-from flask import Flask, render_template, request, redirect, url_for, make_response, send_file, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, make_response, send_file, send_from_directory, session
 from werkzeug.utils import safe_join
 from threading import Thread
 from hashlib import sha256
@@ -34,6 +34,39 @@ HIDDEN_PATHS = tuple([UPLOAD_FOLDER_PATH, GIT_FOLDER_PATH, HOMEPAGE_PATH] + HIDD
 # app = Flask(cfg.app_name)
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER_PATH
+
+app = Flask(__name__)
+app.secret_key = 'your_secret_key'
+
+# Define a list of valid passwords
+VALID_PASSWORDS = ['password1', 'password2']  # You can extend this list as needed
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        password = request.form['password']
+        if password in VALID_PASSWORDS:
+            session['logged_in'] = True
+            return redirect(url_for('index'))  # Redirect to a protected route after login
+        else:
+            return render_template('login.html', error='Invalid password')
+    else:
+        return render_template('login.html')
+
+
+@app.route('/logout')
+def logout():
+    session.pop('logged_in', None)
+    return redirect(url_for('index'))
+
+
+@app.route('/protected')
+def protected():
+    if 'logged_in' in session:
+        return 'This is a protected route. Only logged-in users can access this.'
+    else:
+        return redirect(url_for('login'))
 
 # console logger
 app.logger.setLevel(logging.INFO)
