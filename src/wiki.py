@@ -67,10 +67,15 @@ def login():
 @app.route('/logout')
 def logout():
     session.pop('logged_in', None)
-    return redirect(url_for('index'))
+    return redirect(url_for('login'))
 
 
-@app.route('/')
+@app.route('/', methods=['GET'])
+def default():
+    return redirect(url_for('login'))
+
+
+@app.route('/index')
 @login_required
 def index():
     return render_template('index.html')
@@ -282,34 +287,34 @@ def file_page(file_page):
             return redirect("/add_new?page=" + file_page)
 
 
-@app.route('/', methods=['GET'])
-def index():
-    if request.args.get("q"):
-        return search(request.args.get("q"), request.args.get("page", 1))
-    else:
-        html = ""
-        app.logger.info("Showing HTML page >>> 'homepage'")
+# @app.route('/', methods=['GET'])
+# def index():
+#     if request.args.get("q"):
+#         return search(request.args.get("q"), request.args.get("page", 1))
+#     else:
+#         html = ""
+#         app.logger.info("Showing HTML page >>> 'homepage'")
 
-        md_file_path = os.path.join(cfg.wiki_directory, cfg.homepage)
-        cached_entry = cache.get(md_file_path)
-        if cached_entry:
-            app.logger.info("Showing HTML page from cache >>> 'homepage'")
-            return render_template(
-                'index.html', homepage=cached_entry, system=SYSTEM_SETTINGS, app_title=cfg.app_name
-            )
+#         md_file_path = os.path.join(cfg.wiki_directory, cfg.homepage)
+#         cached_entry = cache.get(md_file_path)
+#         if cached_entry:
+#             app.logger.info("Showing HTML page from cache >>> 'homepage'")
+#             return render_template(
+#                 'index.html', homepage=cached_entry, system=SYSTEM_SETTINGS, app_title=cfg.app_name
+#             )
 
-        try:
-            app.logger.info("Converting to HTML with pandoc >>> 'homepage' ...")
-            html = pypandoc.convert_file(
-                md_file_path, "html5", format='md', extra_args=["--mathjax"],
-                filters=['pandoc-xnos'])
-            html = clean_html(html)
-            cache.set(md_file_path, html)
+#         try:
+#             app.logger.info("Converting to HTML with pandoc >>> 'homepage' ...")
+#             html = pypandoc.convert_file(
+#                 md_file_path, "html5", format='md', extra_args=["--mathjax"],
+#                 filters=['pandoc-xnos'])
+#             html = clean_html(html)
+#             cache.set(md_file_path, html)
 
-        except Exception as e:
-            app.logger.error(f"Conversion to HTML failed >>> {str(e)}")
+#         except Exception as e:
+#             app.logger.error(f"Conversion to HTML failed >>> {str(e)}")
 
-        return render_template('index.html', homepage=html, system=SYSTEM_SETTINGS, app_title=cfg.app_name)
+#         return render_template('index.html', homepage=html, system=SYSTEM_SETTINGS, app_title=cfg.app_name)
 
 
 @app.route('/add_new', methods=['POST', 'GET'])
