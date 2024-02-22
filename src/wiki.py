@@ -35,11 +35,19 @@ HIDDEN_PATHS = tuple([UPLOAD_FOLDER_PATH, GIT_FOLDER_PATH, HOMEPAGE_PATH] + HIDD
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER_PATH
 
-app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
 # Define a list of valid passwords
 VALID_PASSWORDS = ['password1', 'password2']  # You can extend this list as needed
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'logged_in' in session:
+            return f(*args, **kwargs)
+        else:
+            return redirect(url_for('login', next=request.url))
+    return decorated_function
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -48,7 +56,8 @@ def login():
         password = request.form['password']
         if password in VALID_PASSWORDS:
             session['logged_in'] = True
-            return redirect(url_for('index'))  # Redirect to a protected route after login
+            next_page = request.args.get('next')
+            return redirect(next_page or url_for('index'))  # Redirect to the next page if specified
         else:
             return render_template('login.html', error='Invalid password')
     else:
@@ -61,12 +70,16 @@ def logout():
     return redirect(url_for('index'))
 
 
+@app.route('/')
+@login_required
+def index():
+    return render_template('index.html')
+
+
 @app.route('/protected')
+@login_required
 def protected():
-    if 'logged_in' in session:
-        return 'This is a protected route. Only logged-in users can access this.'
-    else:
-        return redirect(url_for('login'))
+    return 'This is a protected route. Only logged-in users can access this.'
 
 # console logger
 app.logger.setLevel(logging.INFO)
